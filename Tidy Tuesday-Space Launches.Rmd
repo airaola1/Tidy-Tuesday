@@ -1,0 +1,81 @@
+---
+title: "Space Launches!"
+author: "Andrew Iraola"
+date: "May 8, 2019"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+```
+
+```{r}
+data <- readr::read_csv ("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-01-15/launches.csv")
+```
+
+Alllright: 
+1. Let's try to make a new variable that shows decade by decade (instead of by every individual year)
+2. Let's change out that weird country code sh*t that is not in the least bit intuitive. Ex. `I-ESA` and `I-ELDO`
+```{r}
+data <- data %>%
+  mutate(decade = ifelse(launch_year <= 1969, 1960
+                  ,ifelse(1970 <= launch_year & launch_year <= 1979, 1970
+                  ,ifelse(1980 <= launch_year & launch_year <= 1989, 1980
+                  ,ifelse(1990 <= launch_year & launch_year <= 1999, 1990
+                  ,ifelse(2000 <= launch_year & launch_year <= 2009, 2000
+                  ,2010)))))) %>%
+  
+ mutate(state_code = ifelse(state_code=="CN", "China", ifelse(state_code=="F", "France",  ifelse(state_code=="BR", "Brazil",
+                     ifelse(state_code=="CYM", "Cayman Islands", ifelse(state_code=="I", "India", ifelse(state_code=="I-ELDO", "European Space Agency(Former)",
+                     ifelse(state_code=="I-ESA", "European Space Agency", ifelse(state_code=="IL", "Israel", ifelse(state_code=="IN", "India", 
+                     ifelse(state_code=="IR", "Iran", ifelse(state_code=="J", "Japan", ifelse(state_code=="KP", "Republic of Korea", 
+                     ifelse(state_code=="KR", "Republic of Korea", ifelse(state_code=="RU", "Russia", ifelse(state_code=="SU", "Soviet Union",
+                     state_code))))))))))))))))  
+```
+Getting the number of right-parenthesis figured out was a paaain, haha. Rule of thumb, it's actually just number of `ifelse` statements + 1
+
+
+Next, let's get the average number of successes (`O`s) in every decade for each agency, by state launch providers. *Sharp exhale*
+
+First we'll count up the number of successes and failures for each agency by decade utilizing the `tally` function.
+```{r}
+category <- data %>% 
+  filter(agency_type %in% c("state")) %>% 
+  group_by(state_code, decade, category) %>%
+  tally
+```
+
+Adds the column, `success_rate` which will be derived the `category` column, based on success `O` or failure `F`. 
+First, I filter it so I only show the "O" values, then illustrate what is that rate of success, per decade. 
+```{r}
+total <- data %>% 
+  filter(agency_type %in% c("state")) %>% 
+  group_by(state_code, decade) %>% 
+  tally
+
+categ_total <- merge(category, total, by=c("state_code","decade")) 
+
+categ_total <- categ_total %>%
+  filter(category %in% c("O")) %>%  
+    mutate(success_rate = n.x/n.y)
+```
+
+Graph it up!
+```{r}
+Plot <- ggplot(categ_total,
+  aes(x = decade, y = success_rate, fill = state_code)) +
+  geom_bar(stat="identity",size=1.5) +
+  facet_wrap(~state_code) +
+  labs(x = "Country", y = "Success Rate", fill="Country") +
+  ggtitle("Success Rate of State-Sponsored Spaces Launches \nRelative to Total Attempts Per Decade") +
+  theme_minimal() + 
+  scale_y_continuous(limits = c(0, 1),labels = scales::percent_format(accuracy = 1)) 
+  xlab(" ") 
+
+  Plot 
+```
+
+
+
+

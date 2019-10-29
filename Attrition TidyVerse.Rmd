@@ -1,0 +1,158 @@
+---
+title: "An Animated Attrition Analysis"
+author: "Andrew Iraola"
+date: "March 5, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Loading Necessary Packages    
+```{r message=FALSE}
+library(tidyverse)
+library(GGally)
+library(readxl)
+library(broom)
+library(stargazer)
+library(modelr)
+library(gganimate)
+library(gifski)
+library(ggthemes)
+```
+
+
+### Pulling the Necessary Data from Analytix
+Let's wrangle the (excel spreadsheet) datasets into R Markdown. For this project, we're going to utilize Attrition and Enrollment Data from 2011-2018.
+The only change I made to the spreadsheet(s) was to delete row 2, so that only the variable names considered and not their descriptors. 
+
+```{r}
+attrition <- read_excel("C:/Users/airaola/Desktop/TidyTuesdays/Week 1/DataSet Attrition .xlsx")
+JD1_enrollment <-read_excel("C:/Users/airaola/Desktop/TidyTuesdays/Week 1/DataSet Enrollment .xlsx", sheet=2)
+Total_JD_enrollment <-read_excel("C:/Users/airaola/Desktop/TidyTuesdays/Week 1/DataSet Enrollment .xlsx")
+```
+
+
+I'm now going to subset the second worksheet of the `Dataset Enrollment` dataset to focus on only the variables (column names) we need. 
+```{r}
+JD1_enrollment <- JD1_enrollment %>%
+  dplyr::select(schoolid, calendaryear, totaljd1)
+```
+
+
+Repeating the process for the first worksheet (*Total JD Enrollment*)
+```{r}
+Total_JD_enrollment <- Total_JD_enrollment %>%
+  dplyr::select(schoolid, calendaryear, totaljd)
+```
+
+
+Before we add these to the Attrition Dataset, "Dataset Attrition", we need to tidy up a few things.
+Firstly, it seems to be reading in `schoolid` as a character variable. Let's switch that to numeric with the below command:
+```{r}
+attrition$schoolid <- as.numeric(attrition$schoolid)
+```
+
+Let's also add a column to the Attrition Dataset that calculates "Total Attrition" as follows:
+```{r}
+attrition %>%
+mutate(TotalAttrition = totaljd1attrition + totaljd2attrition + totaljd3attrition + totaljd4attrition, na.rm=T)
+
+```
+
+
+Now, let's merge the three datasets! To do this, I'm going to add the columns we pulled from `JD1_enrollment` and `Total_JD_enrollment` to the `attrition` dataset we just got done manipulating. The merge will be by `schoolid` and `calendaryear` so that everything stays in it's corresponding row (school) and year according. 
+```{r}
+attrition <- attrition %>%
+  left_join(JD1_enrollment, by = c("schoolid", "calendaryear")) %>%
+  left_join(Total_JD_enrollment, by = c("schoolid", "calendaryear"))
+```
+
+
+
+And now, the fun part- We'll begin with grouping by `calendaryear`, then summing each column for which we want yearly totals. 
+
+1. JD1 Attrition 
+2. Total Attrition
+3. JD1 Enrollment
+4. Total Enrollment
+
+We'll then `mutate` these sums to get the proportion of students that left law school based on enrollment figures. We'll do this for JD1 as well as the total (1L-4L).
+
+Filtering out 2018 (for which there is not yet data), we then plot the two mutations: `JD1_AttritionPercentage` and `Total_AttritionPercentage`.
+I chose to use a `theme_minimal()` line graph for now.
+```{r}
+attrition %>%
+  group_by(calendaryear) %>%
+  summarise(JD1_attrition = sum(totaljd1attrition, na.rm=T),
+            JD2_attrition = sum(totaljd2attrition, na.rm=T),
+            JD3_attrition = sum(totaljd3attrition, na.rm=T),
+            JD4_attrition = sum(totaljd4attrition, na.rm=T),
+            JD1_enrollment = sum(totaljd1, na.rm=T),
+            Total_JD_enrollment = sum(totaljd, na.rm=T)) %>%
+  mutate (Total_AttritionPercentage = ((JD1_attrition + JD2_attrition + JD3_attrition + JD4_attrition)/Total_JD_enrollment)*100) %>%
+  mutate (JD1_AttritionPercentage = (JD1_attrition/JD1_enrollment)*100) %>%
+  filter (calendaryear != 2018) %>%
+  
+  ggplot (aes(calendaryear, JD1_AttritionPercentage)) +
+  geom_line (aes(calendaryear, JD1_AttritionPercentage), color="forest green") +
+  geom_line (aes(calendaryear, Total_AttritionPercentage, color="red")) + 
+  scale_color_discrete(name = "Type", labels = c("Total", "First")) +
+  theme_minimal() +
+  xlab("Year") +
+  ylab("Percent") +
+  ylim(0,15) + 
+  ggtitle("Attrition as a Percentage of Enrollment", "March 2018") + 
+  theme(plot.title=element_text(hjust = 0.5)) + 
+  theme(plot.subtitle = element_text(hjust = 0.5)) 
+    
+```
+
+But that doesn't look quite right. It seems to only register the secondary label-heading and ignore the first. 
+Let's try something different with the `select` and `gather` functions. I'll also change from the minimal theme to that of the Economist. 
+
+```{r}
+P1 <- attrition %>%
+  group_by(calendaryear) %>%
+  summarise(JD1_attrition = sum(totaljd1attrition, na.rm=T),
+            JD2_attrition = sum(totaljd2attrition, na.rm=T),
+            JD3_attrition = sum(totaljd3attrition, na.rm=T),
+            JD4_attrition = sum(totaljd4attrition, na.rm=T),
+            JD1_enrollment = sum(totaljd1, na.rm=T),
+            Total_JD_enrollment = sum(totaljd, na.rm=T)) %>%
+  mutate (Total_AttritionPercentage = ((JD1_attrition + JD2_attrition + JD3_attrition + JD4_attrition)/Total_JD_enrollment)*100) %>%
+  mutate (JD1_AttritionPercentage = (JD1_attrition/JD1_enrollment)*100) %>%
+  filter (calendaryear != 2018) %>%
+  
+  select(calendaryear, Total_AttritionPercentage, JD1_AttritionPercentage) %>%
+  gather(key, value, -calendaryear) %>%
+  ggplot(aes(calendaryear, value, color=key, frame = calendaryear)) +
+  geom_line() + 
+  scale_color_discrete(name = "Type", labels = c("Total", "First Year")) +
+  theme_economist() +
+  xlab("Year") +
+  ylab("Percent") +
+  ylim(0,15) + 
+  ggtitle("Total Law School Attrition as a Percentage of Enrollment", "March 2018") + 
+  theme(plot.title=element_text(hjust = 0.5)) + 
+  theme(plot.subtitle = element_text(hjust = 0.5)) 
+
+P2 <- P1 + geom_point(aes(group=seq_along(calendaryear))) +
+  transition_reveal(calendaryear)
+P2
+```
+
+Now let's get it ready for presentation.
+**`gganimate`**, do yo thing!
+
+
+```{r}
+P2 <- P1 + geom_point(aes(group=seq_along(calendaryear))) +
+  transition_reveal(calendaryear)
+P2
+```
+
+```{r}
+anim_save("TidyTuesday1")
+```

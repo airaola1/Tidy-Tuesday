@@ -1,0 +1,113 @@
+---
+title: "Tidy Tuesday- Data Deck Enrollment Map"
+author: "Andrew Iraola"
+date: "August 22, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(maps)
+library(ggplot2)
+library(ggthemes)
+library(tidyverse)
+library(janitor)
+library(readxl)
+# Loading our dataset
+Enrollment <- read_excel("Data Deck 2.0.xlsx")
+Census_data <-read_excel("Census Data.xlsx")
+
+# Cleaning our data so we can werk with it
+Enrollment <- Enrollment %>%
+clean_names() %>%
+  filter(x2018_total_jd_enrollment!="NA", x2017_total_jd_enrollment!="NA") %>%
+  select(school_state, x2018_total_jd_enrollment , x2017_total_jd_enrollment) %>%
+    mutate(x2018_total_jd_enrollment=as.numeric(x2018_total_jd_enrollment)) %>%
+   mutate(x2017_total_jd_enrollment=as.numeric(x2017_total_jd_enrollment)) %>%
+    group_by(school_state) %>%
+     summarise(Total_2018=sum(x2018_total_jd_enrollment, na.omit=TRUE), Total_2017=sum(x2017_total_jd_enrollment, na.omit=TRUE)) %>%
+ ungroup()
+
+# Now, let's add a new variable that captures the percent change between 2017 and 2018
+Enrollment<- Enrollment %>%
+  mutate(Percent_change=(Total_2018-Total_2017)/Total_2018)
+```
+
+```{r}
+us_states <- map_data ("state")
+#head(us_states)
+
+p <- ggplot(data = us_states,
+            mapping=aes(x=long, y=lat,
+                        group=group))
+
+p <- p + geom_polygon(color="black", fill="white", size=0.1) + guides(fill=FALSE) + 
+  theme_map()
+
+# leftjoing enrollment to us_states by=c("school_state"="region")
+semifinal_dataset <- left_join(us_states, Enrollment, by=c("region" = "school_state")) 
+
+final_dataset <- left_join(semifinal_dataset, Census_data, by=c("region" = "State"))
+
+final_dataset <- final_dataset %>%
+  mutate(State_Percent_2017 = Total_2017/est_2017) %>%
+  mutate(State_Percent_2018 = Total_2018/est_2018)
+```
+
+Now, I'm going to create a cloropleth that details the percent change in enrollment between years
+```{r}
+P1 <- final_dataset %>%
+  ggplot(aes(x=long, y=lat,
+             group=group, fill=Percent_change)) +
+  geom_polygon(color="gray90", size=0.1) +
+  coord_map(projection="albers", lat0=39, lat1=45) + 
+  theme_map() + 
+  labs(title="Percentage Change in Law School Enrollment (2017-2018), by State", fill="Percentage") +
+  scale_fill_gradient(low="grey", high="dodgerblue")
+P1
+```
+
+For the sake of completeness, let's do the same for *total enrollment, by state* for 2017
+```{r}
+P2 <- final_dataset %>%
+  ggplot(aes(x=long, y=lat,
+             group=group, fill=State_Percent_2017)) +
+  geom_polygon(color="gray90", size=0.1) +
+  coord_map(projection="albers", lat0=39, lat1=45) + 
+  theme_map() + 
+  labs(title="Fall 2017 J.D. Enrollment by State, as a Proportion of Each State's Population", fill="Percentage") +
+  scale_fill_gradient(low="grey", high="dodgerblue", labels=scales::comma_format(accuracy=.0001))  
+```
+
+Finally, repeat this for 2018
+```{r}
+P3 <- final_dataset %>%
+  ggplot(aes(x=long, y=lat,
+             group=group, fill=State_Percent_2018)) +
+  geom_polygon(color="gray90", size=0.1) +
+  coord_map(projection="albers", lat0=39, lat1=45) + 
+  theme_map() + 
+  labs(title="Fall 2018 J.D. Enrollment by State, as a Proportion of Each State's Population", fill="Percentage") +
+  scale_fill_gradient(low="grey", high="dodgerblue", labels=scales::comma_format(accuracy=.0001)) 
+P3
+```
+
+```{r}
+grid <- matrix(c(1,1,2,3), nrow = 2,
+               ncol = 2, byrow = TRUE)
+grid
+
+layout(grid)
+plot(P1, P2, P3)
+plot(P2)
+plot(P3)
+```
+
+
+
+
+

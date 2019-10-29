@@ -1,0 +1,80 @@
+---
+title: "Tidy Tuesday Week 3"
+author: "Andrew Iraola"
+date: "April 1, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE}
+### Loading Necessary Packages    
+library(tidyverse)
+library(GGally)
+library(readxl)
+library(broom)
+library(stargazer)
+library(modelr)
+library(gganimate)
+library(gifski)
+library(plotly)
+library(ggthemes)
+```
+
+## Loading Our Data in
+
+```{r echo=FALSE, message=FALSE}
+jobs_gender <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-03-05/jobs_gender.csv")
+earnings_female <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-03-05/earnings_female.csv") 
+employed_gender <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-03-05/employed_gender.csv") 
+```
+
+```{r}
+head(earnings_female)
+```
+
+```{r}
+head(employed_gender)
+```
+
+```{r}
+head(jobs_gender)
+```
+
+```{r}
+employed_gender %>%
+  mutate(FemalePercentage = full_time_female / full_time_male) %>%
+  ggplot(aes(year, FemalePercentage)) + 
+  geom_line() +
+  theme_minimal() + 
+  ggtitle("The Wage-Gap Visualized Over Time", "For Full-Time Employees") +
+  xlab("Year") +
+  ylab("Female Salary as a Percent of Male Salary") + 
+  scale_y_continuous(limits = c(.75,.95),labels = scales::percent_format(accuracy = 1))
+```
+
+```{r}
+
+P <- earnings_female %>%
+   ggplot(aes(Year, percent, color=group))+ 
+   geom_line() +
+   theme_stata() +
+   ggtitle("Women's Salary as a Percentage of Men's Salary", "By Age Group from 1979-2010") +
+   xlab("Year") +
+   ylab("Percent") + 
+   labs(color="Age Group") +
+   
+   P <- ggplotly(P)
+   P
+
+```
+
+Now, just turn this into a plotly chart tomorrow. 
+
+
+
+
+
+

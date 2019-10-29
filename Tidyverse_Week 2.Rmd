@@ -1,0 +1,136 @@
+---
+title: "Tidy Tuesday Week Two"
+author: "Andrew Iraola"
+date: "March 19, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Let's Get at that Dataset
+
+```{r echo = FALSE, message=FALSE}
+library(tidyverse)
+library(readxl)
+library(Amelia)
+library(GGally)
+library(broom)
+library(modelr)
+library(stargazer)
+library(car)
+library(lme4)
+library(htmlwidgets)
+library(ggplot2)
+library(plotly)
+library(lattice)
+```
+
+```{r echo=FALSE, message=FALSE}
+schools <- lapply(Sys.glob("R:/Level 2/17-18_School*.xlsx"), read_excel)
+
+all_schools <- Reduce(function(x, y) merge(x, y, all=TRUE), schools, accumulate=FALSE)
+```
+
+Checking for missingness...
+```{r}
+missmap(all_schools)
+```
+
+...Yea that didn't tell me anything, 
+it kinda looks like a [Rothko](https://www.google.com/search?q=rothko&rlz=1C1GCEA_enUS793US793&source=lnms&tbm=isch&sa=X&ved=0ahUKEwivob770Y7hAhWjiOAKHUzAA1MQ_AUIDigB&biw=1497&bih=658)
+
+```{r message=FALSE, echo=FALSE}
+
+# Race as a factor
+all_schools$Race <- ifelse (all_schools$Race=="Black or African American" | all_schools$Race=="Black or African                               american", paste("Black"), all_schools$Race)
+all_schools$Race <- ifelse (all_schools$Race=="Hispanics of any race", paste("Hispanic"), all_schools$Race)
+all_schools$Race <- ifelse (all_schools$Race=="White", paste("White"), all_schools$Race)
+all_schools$Race <- ifelse (all_schools$Race=="Asian", paste("Asian"), all_schools$Race)
+all_schools$Race <- ifelse (all_schools$Race=="American Indian or Alaska Native"|all_schools$Race=="Native                                    Hawaiian or Other Pacific Islander", paste("NA/PI"), all_schools$Race)
+all_schools$Race <- ifelse (all_schools$Race=="Nonresident alien"| all_schools$Race=="Two or More                                             Races"|all_schools$Race=="Race and Ethnicity Unknown", paste("Other"), all_schools$Race)
+all_schools$Race <- factor(all_schools$Race)
+all_schools$Race <- factor(all_schools$Race, levels=c("White", "Asian", "Black", "Hispanic", "NA/PI", "Other"))
+```
+
+
+Let's try something different. Instead, only focusing on all our relevant variables for analysis. 
+```{r}
+all_schools %>%
+  select(BarResult, Race, Gender, CreditHrs_Doctrinal, CreditHrs_Skill, CreditHrs_Clinic, CreditHrs_Externship,
+         CreditHrs_Journals, CreditHrs_Moot, CreditHrs_Trial, CreditHrs_Other) %>%
+missmap()
+```
+Now, although we can't see any specifity on the Y-axis, we can still contextualize how much missingness there is for our variable-set. Given that only 2 percent is missing, that tells us we can continue with our analysis.
+
+
+Now, let's peak at the relationship between `Bar Result` and various classes for which credit hours were reported.
+
+```{r}
+sum(is.na(all_schools$BarResult)) 
+```
+
+In isolation:
+```{r}
+all_schools %>%
+  ggplot(aes(x = CreditHrs_Skill, y = BarResult, color = as.factor(SchoolID))) +
+  geom_point()
+  #geom_smooth(method = "lm")
+```
+
+SchoolID as factor
+```{r}
+all_schools$SchoolID <- as.factor(all_schools$SchoolID)
+```
+
+
+
+## Multi-level Model
+
+```{r}
+all_schools <- all_schools %>%
+  mutate(BarPass = ifelse(BarResult == "Pass", 1, 0)) 
+
+BarResult_Model <- glm (BarPass ~ CreditHrs_Doctrinal + CreditHrs_Skill + Gender + Race, 
+                             data = all_schools)
+summary(BarResult_Model)
+```
+Well that's wholly uninteresting...
+
+
+```{r}
+all_schools 
+  
+  p <- ggplot (all_schools, aes(x = Yr1_Rank, y = Final_GPA, color = as.factor(SchoolID))) +
+  geom_point () +
+  xlab ("1L Class Ranking") +
+  ylab ("Final GPA") +
+  ggtitle ("Final Law School GPA by 1L Class Ranking", "March 2019") +
+  scale_color_discrete(name = "School") + 
+  geom_smooth (method = "lm")
+
+p <- ggplotly(p)
+
+saveWidget(p,"TidyTuesday2.html")
+```
+
+```{r}
+all_schools <- all_schools %>%
+  mutate(BarPass = ifelse(BarResult == "Pass", 1, 0)) 
+
+BarResult_Model <- lm(BarPass ~ clquest + clunprep + journal + mootcrt + orgmembr + 
+                          work + caredep + commute + parenteduc + grades + Race + Gender, 
+                             data = all_schools)
+summary(BarResult_Model)
+```
+
+
+
+
+
+
+
+
+
+

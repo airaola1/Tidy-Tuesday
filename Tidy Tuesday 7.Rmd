@@ -1,0 +1,65 @@
+---
+title: "Tidy Tuesday Week 7"
+author: "Andrew Iraola"
+date: "June 11, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(ggthemes)
+library(lubridate)
+brexit <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2019/2019-04-16/brexit.csv")
+```
+
+```{r}
+brexit %>%
+  mutate(Date=dmy(date)) %>%
+  
+  ggplot(aes(x=Date)) +
+  geom_line(aes(y=percent_responding_right), color="dodgerblue3", lwd=1.5) +
+  geom_line(aes(y=percent_responding_wrong), color="firebrick2", lwd=1.5) + 
+  theme_economist_white() +
+  scale_colour_economist() + 
+  scale_y_continuous(position = "right") +
+  theme(plot.title = element_text(family = 'Helvetica', color = 'black', size = 15, hjust = 0), 
+      legend.position = c(.90, .35)) + 
+  labs(x="", y="", title='"In hindsight, do you think Britain was right or wrong\n to vote to leave the EU?" [Original Graph]', subtitle="% responding", 
+       caption="Source: NatlCen Social Research") +
+  coord_cartesian(ylim = c(39, 48))
+```
+
+
+```{r}
+brexit1 <- brexit %>%
+  mutate(date = dmy(date)) %>%
+  gather(type, number, -date)
+  
+brexit1 %>%
+  ggplot(aes(x=date, y=number, color=type)) +
+  geom_smooth(lwd=1.5, se=FALSE, show.legend = FALSE) +
+  #geom_smooth(aes(y=percent_responding_wrong), color="firebrick2", lwd=1.5, se=FALSE) + 
+  geom_point(lwd=1.5, alpha=0.3, show.legend = FALSE) +
+  #geom_point(aes(y=percent_responding_wrong), color="firebrick2", lwd=1.5, alpha=0.3) +
+  theme_economist_white() +
+  scale_colour_economist() + 
+  scale_y_continuous(position = "right") +
+  theme(plot.title = element_text(family = 'Helvetica', color = 'black', size = 15, hjust = 0), 
+      legend.position = c(.90, .35)) + 
+  labs(x="", y="", title='"In hindsight, do you think Britain was right or wrong\n to vote to leave the EU?" [Better Graph]', subtitle="% responding",  caption="Source: NatlCen Social Research") +
+  coord_cartesian(ylim = c(39, 48)) +
+  geom_text(data = brexit1[brexit1$date == "2018-01-17" & brexit1$type=="percent_responding_right",], label="Right" , vjust = -1, color = "black") +
+  geom_text(data = brexit1[brexit1$date == "2018-01-17" & brexit1$type=="percent_responding_wrong",], label="Wrong" , vjust = 2.7, color = "black") +
+  scale_color_manual(values=c("dodgerblue3", "firebrick2")) +
+  scale_x_date(date_breaks="6 month", date_labels="%b-%y")
+```
+
+
+
+
+

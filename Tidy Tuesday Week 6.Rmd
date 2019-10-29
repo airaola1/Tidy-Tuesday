@@ -1,0 +1,49 @@
+---
+title: "Tidy Tuesday Week 6"
+author: "Andrew Iraola"
+date: "June 6, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+First, I'm gonna load in the necessary packages, then our dataset for the work to be conducted.
+```{r}
+library(tidyverse)
+library(maps)
+library(usmap)
+library(ggplot2)
+state_expenses <- read.csv("C:/Users/airaola/Desktop/TidyTuesdays/Week 6/State Expenses Spreadsheet.csv")
+```
+
+Next, I create a new column within our dataset (it'll automatically be the furthest right column). 
+`Academic_Percentage` provides the percentage of total state institution level expenses  spent on `Academic.support` in relation to `Total` expenses
+```{r}
+state_expenses <- state_expenses %>%
+                  mutate(Academic_Percentage=(Academic.support/Total)*100)
+```
+
+Lastly, we join this dataset with the `map_data` dataset. I accomplish this by first making the `region` column within it, capitalized (so as to match the other dataset). Then, the `left_join` function combines these datasets into one. 
+
+The subsequent graph is created with the code below. We can change out `Academic_Percentage` with any variable within the new dataset to get a sense of the scale for by state, within the `fill=` command. 
+For instance, looking at `Total` state expendiditures, we can see that California spends far more than any other state in total. However, this graph tells a bit more of a story. Hence, the code below details `Academic_Percentage`. 
+
+```{r}
+map_data ("state") %>%
+             mutate(region=str_to_title(region)) %>%
+             left_join(state_expenses, by=c("region"="State")) %>%
+               ggplot(aes(x=long, y=lat, group=group, fill=Academic_Percentage)) +
+             geom_polygon(color="#002b49", size=0.1) + 
+  coord_map() +
+  theme_void() + 
+theme(plot.title = element_text(family = 'Helvetica', color = '#002b49', face = 'bold', size = 15, hjust = 0), 
+      legend.position = c(.90, .35)) + 
+ggtitle("Percentage of State Public Postsecondary Institution Level Expenses \nSpent on Academic Support in 2017")  +
+  labs(fill="%") 
+```
+
+
+
+
+

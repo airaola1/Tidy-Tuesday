@@ -1,0 +1,176 @@
+---
+title: 'Tidy Tuesday #4: Admissions'
+author: "Andrew Iraola"
+date: "April 24, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Alright, Let's Get Into It..
+
+```{r message=FALSE}
+### Loading Necessary Packages    
+library(tidyverse)
+library(broom)
+library(Amelia)
+library(GGally)
+library(readxl)
+library(car)
+library(stargazer)
+library(ggplot2)
+library(modelr)
+library(caret)
+library(magick)
+library(gganimate)
+library(stargazer)
+```
+
+## Loading Our Data in
+
+```{r}
+Admissions <- read_excel("Admissions Data.xlsx")
+```
+
+```{r}
+summary(Admissions)
+```
+
+To `tidy` up race are recoding it to become a factor that is much easier to read for both the analyst and general audience. 
+In this case, we have only 6 non-white students in total (13.6% of the sample) so we are going to separate race by the two largest categories, `White` and `Non-White`. 
+
+```{r}
+Admissions$Race <- ifelse(Admissions$Ethnicity_1_Long=="Black/African American", paste("African American"), Admissions$Ethnicity_1_Long)
+
+
+Admissions$Race <- ifelse(Admissions$Ethnicity_1_Long=="Hispanic/Latino"| Admissions$Ethnicity_1_Long=="Puerto Rican", paste("Hispanic"), Admissions$Race)
+
+Admissions$Race <- ifelse(Admissions$Ethnicity_1_Long=="Caucasian/White", paste("White"), Admissions$Race)
+
+Admissions$Race <- ifelse(Admissions$Ethnicity_1_Long=="American Indian/Alaskan Native"|Admissions$Ethnicity_1_Long=="Native Hawaiian/Other Pacific Islander", paste("Other"), Admissions$Race)
+
+
+Admissions$Race <- ifelse(Admissions$Ethnicity_1_Long=="Other"| Admissions$Ethnicity_1_Long=="Did not Indicate", paste("Other"), Admissions$Race)
+
+ Admissions$Race <- factor(Admissions$Race)
+ 
+ Admissions$Race <- factor(Admissions$Race, levels=c("White", "African American", "Hispanic", "Asian", "Other"))
+ 
+table(Admissions$Race)
+
+```
+Before running this model, let's convert the BarResult` variable into a number variable.
+
+```{r}
+Admissions <- Admissions %>%
+  mutate(Admission_Status = ifelse(Decision_Status_Long == "Admitted", 1, 0)) %>%
+  mutate(Law_Based_Major = ifelse(Undergraduate_Major_Long=="LAW"| Undergraduate_Major_Long=="PRE-LAW", 1, 0)) %>%
+  mutate(Male = ifelse(Gender_Applicant == "M", 1, 0))
+```
+
+
+# Outcome 1: Race, Gender, LSAT and other variables on Admission Status
+
+DV:
+
+1. Admission Status (`Admission_Status`)
+
+IVs:
+
+1. Race/ethnicity (`Race`)
+2. Gender (`Male`)
+3. LSAT (`High_LSAT_Score`)
+4. UGPA (`Cumulative_GPA`)
+5. Undergraduate Major (`Law_Based_Major`)
+
+Running the first model:
+
+```{r}
+Admissions_Model <- glm(Admission_Status ~ Race + Male + High_LSAT_Score + Cumulative_GPA + Law_Based_Major, family="binomial", data=Admissions)
+summary(Admissions_Model)
+```
+
+
+```{r}
+vif(Admissions_Model)
+```
+
+
+
+
+## Full Analysis Predictions
+
+
+### LSAT Score
+
+After we create the data frame, well will create the predictions as a new variable within the dataframe. 
+
+```{r}
+LSAT_admit <- Admissions %>%
+  data_grid(High_LSAT_Score = seq_range(High_LSAT_Score, 100), Race, .model = Admissions_Model)
+
+LSAT_admit <- LSAT_admit %>%
+  mutate(pred = predict(Admissions_Model, LSAT_admit, type = "response"))
+```
+
+```{r}
+P <- ggplot(LSAT_admit, 
+       aes(x = High_LSAT_Score, y = pred,
+           color = Race)) +
+  geom_point() +
+  xlab("LSAT Score") +
+  ylab("%") +
+  labs(title = "Predicted Probabilities of Being Admitted to Law School (2013-17)", subtitle = "Model accounts for Demographics, LSAT, UGPA and Undergraduate Major") +
+  scale_colour_discrete(name = "Race/Ethnicity") +
+  theme_minimal() + 
+  scale_y_continuous(labels = scales::percent_format(accuracy=1)) + 
+  coord_cartesian(ylim = c(0,1))  
+
+P2 <- P + geom_point(aes(group=seq_along(High_LSAT_Score))) +
+  transition_reveal(High_LSAT_Score)  
+
+gif1 <- animate(P2, fps = 10, renderer = gifski_renderer(loop = FALSE))
+gif1
+
+anim_save("TidyTuesday4")
+```
+
+## Cumulative Undergraduate GPA
+
+After we create the data frame, well will create the predictions as a new variable within the dataframe. 
+
+```{r}
+UGPA_admit <- Admissions %>%
+  data_grid(Cumulative_GPA = seq_range(Cumulative_GPA, 100), Race, .model = Admissions_Model)
+
+UGPA_admit <- UGPA_admit %>%
+  mutate(pred = predict(Admissions_Model, UGPA_admit, type = "response"))
+```
+
+```{r}
+p <- ggplot(UGPA_admit, 
+       aes(x = Cumulative_GPA, y = pred,
+           color = Race)) +
+  geom_point() +
+  xlab("Cumulative GPA") +
+  ylab("%") +
+  labs(title = "Predicted Probabilities of Being Admitted to Law School (2013-17)", subtitle = "Model accounts for Demographics, LSAT, UGPA and Undergraduate Major") +
+  scale_colour_discrete(name = "Race/Ethnicity") +
+  theme_minimal() + 
+  scale_y_continuous(labels = scales::percent_format(accuracy=1)) + 
+  coord_cartesian(ylim = c(0,1))  
+
+p2 <- p + geom_point(aes(group=seq_along(Cumulative_GPA))) +
+  transition_reveal(Cumulative_GPA)  
+
+gif2 <- animate(p2, fps = 15, renderer = gifski_renderer(loop = FALSE))
+
+gif2
+anim_save("TidyTuesday4.1")
+
+
+
+```
+
